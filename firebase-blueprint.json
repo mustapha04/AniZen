@@ -1,0 +1,120 @@
+{
+  "entities": {
+    "Profile": {
+      "title": "User Profile",
+      "description": "User profile and role management",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "username": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "isBanned": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Favorite": {
+      "title": "Favorite Anime",
+      "description": "Anime added to favorites by user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "animeId": { "type": "integer" },
+        "title": { "type": "string" },
+        "image": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Rating": {
+      "title": "Anime Rating",
+      "description": "User rating for an anime",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "animeId": { "type": "integer" },
+        "rating": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "User comment on anime",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "animeId": { "type": "integer" },
+        "content": { "type": "string" },
+        "likes": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "List": {
+      "title": "Anime List",
+      "description": "Custom anime collection",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "anime": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "AffiliateLink": {
+      "title": "Affiliate Link",
+      "description": "Streaming service affiliate link managed by admin",
+      "type": "object",
+      "properties": {
+        "animeId": { "type": "integer" },
+        "platform": { "type": "string" },
+        "affiliateUrl": { "type": "string" },
+        "clicks": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "AffiliateClick": {
+      "title": "Affiliate Click",
+      "description": "Tracking for affiliate link clicks",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "animeId": { "type": "integer" },
+        "platform": { "type": "string" },
+        "clickedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/profiles/{uid}": {
+      "schema": "Profile",
+      "description": "User profiles"
+    },
+    "/favorites/{favId}": {
+      "schema": "Favorite",
+      "description": "User favorites"
+    },
+    "/ratings/{ratingId}": {
+      "schema": "Rating",
+      "description": "Anime ratings"
+    },
+    "/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "User comments"
+    },
+    "/lists/{listId}": {
+      "schema": "List",
+      "description": "User custom lists"
+    },
+    "/affiliate_links/{linkId}": {
+      "schema": "AffiliateLink",
+      "description": "Affiliate links for streaming"
+    },
+    "/affiliate_clicks/{clickId}": {
+      "schema": "AffiliateClick",
+      "description": "Affiliate click logs"
+    }
+  }
+}
