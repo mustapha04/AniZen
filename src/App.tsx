@@ -38,7 +38,11 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/anime/:id" element={<AnimeDetails />} />
+                <Route path="/anime/:id/:slug" element={<AnimeDetails />} />
                 <Route path="/search" element={<Search />} />
+                <Route path="/trending" element={<Search />} />
+                <Route path="/top-rated" element={<Search />} />
+                <Route path="/genre/:genreName" element={<Search />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/admin-login" element={<AdminLogin />} />
                 

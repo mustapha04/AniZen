@@ -10,11 +10,11 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
           <div className="col-span-1 md:col-span-2">
             <Link to="/" className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 rounded-xl overflow-hidden border border-white/10 hover:border-brand/40 shadow-sm shadow-brand/10 transition-all duration-300">
+              <div className="w-10 h-10 rounded-full bg-white p-0.5 border border-white/20 hover:border-brand/45 shadow-lg shadow-brand/10 transition-all duration-300 flex items-center justify-center">
                 <img 
                   src={brandLogo} 
                   alt="AniZen Logo" 
-                  className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-300" 
+                  className="w-full h-full object-contain rounded-full transform hover:scale-110 transition-transform duration-300" 
                   referrerPolicy="no-referrer" 
                 />
               </div>

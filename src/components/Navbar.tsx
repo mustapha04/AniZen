@@ -22,11 +22,11 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-8">
             <Link to="/" className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl overflow-hidden border border-white/10 hover:border-brand/40 shadow-md shadow-brand/10 transition-all duration-300">
+              <div className="w-10 h-10 rounded-full bg-white p-0.5 border border-white/20 hover:border-brand/45 shadow-lg shadow-brand/10 transition-all duration-300 flex items-center justify-center">
                 <img 
                   src={brandLogo} 
                   alt="AniZen Logo" 
-                  className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-300" 
+                  className="w-full h-full object-contain rounded-full transform hover:scale-110 transition-transform duration-300" 
                   referrerPolicy="no-referrer" 
                 />
               </div>

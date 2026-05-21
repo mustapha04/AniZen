@@ -9,16 +9,22 @@ interface AnimeCardProps {
 }
 
 export default function AnimeCard({ anime }: AnimeCardProps) {
+  const slug = (anime.title_english || anime.title)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+
   return (
     <motion.div
       whileHover={{ y: -8 }}
       className="group relative bg-white/5 rounded-2xl overflow-hidden shadow-lg transition-all duration-300 border border-white/5 hover:border-white/20"
     >
-      <Link to={`/anime/${anime.mal_id}`}>
+      <Link to={`/anime/${anime.mal_id}/${slug}`}>
         <div className="aspect-[3/4] relative overflow-hidden">
           <img
             src={anime.images.jpg.large_image_url}
-            alt={anime.title}
+            alt={`Official promotional cover poster of the anime ${anime.title_english || anime.title} on AniZen`}
+            loading="lazy"
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">

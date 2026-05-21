@@ -9,13 +9,18 @@ interface HeroProps {
 }
 
 export default function Hero({ anime }: HeroProps) {
+  const slug = (anime.title_english || anime.title)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+
   return (
     <div className="relative h-[80vh] w-full overflow-hidden">
       {/* Background Image with Overlay */}
       <div className="absolute inset-0">
         <img
           src={anime.images.jpg.large_image_url}
-          alt={anime.title}
+          alt={`Featured epic background of anime series ${anime.title_english || anime.title} on AniZen`}
           className="w-full h-full object-cover object-top scale-110 blur-[2px] opacity-40"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-bg-dark via-bg-dark/20 to-transparent" />
@@ -49,14 +54,14 @@ export default function Hero({ anime }: HeroProps) {
 
           <div className="flex flex-wrap gap-4">
             <Link
-              to={`/anime/${anime.mal_id}`}
+              to={`/anime/${anime.mal_id}/${slug}`}
               className="px-10 py-5 brand-gradient text-white font-bold rounded-2xl flex items-center gap-3 transition-all neon-glow shadow-2xl shadow-brand/20 group hover:scale-105"
             >
               <Play className="w-5 h-5 fill-current" />
               Begin Journey
             </Link>
             <Link
-              to={`/anime/${anime.mal_id}`}
+              to={`/anime/${anime.mal_id}/${slug}`}
               className="px-10 py-5 glass hover:bg-white/10 text-white font-bold rounded-2xl flex items-center gap-3 transition-all"
             >
               <Info className="w-5 h-5" />
