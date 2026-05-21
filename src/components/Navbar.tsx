@@ -46,8 +46,8 @@ export default function Navbar() {
             
             {user ? (
               <div className="flex items-center gap-4">
-                {profile?.role === "admin" && (
-                  <Link to="/admin-dashboard" className="p-2 text-gray-300 hover:text-brand transition-colors">
+                {(profile?.role === "admin" || profile?.role === "moderator") && (
+                  <Link to="/admin-dashboard" className="p-2 text-gray-300 hover:text-brand transition-colors" title="Control Panel">
                     <LayoutDashboard className="w-5 h-5" />
                   </Link>
                 )}
@@ -92,8 +92,8 @@ export default function Navbar() {
                   <Link to="/favorites" onClick={() => setIsOpen(false)} className="block text-base font-medium text-gray-300">Favorites</Link>
                   <Link to="/lists" onClick={() => setIsOpen(false)} className="block text-base font-medium text-gray-300">Collections</Link>
                   <Link to="/profile" onClick={() => setIsOpen(false)} className="block text-base font-medium text-gray-300">Profile</Link>
-                  {profile?.role === "admin" && (
-                    <Link to="/admin-dashboard" onClick={() => setIsOpen(false)} className="block text-base font-medium text-gray-300">Admin Dashboard</Link>
+                  {(profile?.role === "admin" || profile?.role === "moderator") && (
+                    <Link to="/admin-dashboard" onClick={() => setIsOpen(false)} className="block text-base font-medium text-gray-300">Control Panel</Link>
                   )}
                   <button onClick={handleLogout} className="block w-full text-left text-base font-medium text-red-400">Logout</button>
                 </>

@@ -23,8 +23,10 @@ export default function Login() {
       console.error(e);
       if (e.code === 'auth/popup-blocked' || e.code === 'auth/cancelled-popup-request' || e.message?.includes('assertion failed')) {
         setError('Login blocked by browser security. Click "Open in New Window" below to log in safely.');
+      } else if (e.code === 'auth/unauthorized-domain') {
+        setError(`Domain not authorized! You must add "${window.location.hostname}" to the Authorized Domains list in your Firebase Console (Authentication > Settings > Authorized Domains).`);
       } else {
-        setError('Authentication failed. Please check your connection.');
+        setError(`Authentication failed: ${e.message || e.code || 'Please check your connection.'}`);
       }
     } finally {
       setLoading(false);

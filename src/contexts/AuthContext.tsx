@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (docSnap.exists()) {
             const data = docSnap.data();
             // Auto-promote specified email to admin
-            if (user.email === "thefeedbuzz.store@gmail.com" && data.role !== "admin") {
+            if ((user.email === "thefeedbuzz.store@gmail.com" || user.email === "mustaphaelibrahimi6@gmail.com") && data.role !== "admin") {
               const updatedProfile = { ...data, role: "admin" };
               try {
                 await setDoc(docRef, updatedProfile, { merge: true });
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: user.email,
               username: user.displayName || user.email?.split("@")?.[0] || "User",
               avatarUrl: user.photoURL,
-              role: user.email === "thefeedbuzz.store@gmail.com" ? "admin" : "user",
+              role: (user.email === "thefeedbuzz.store@gmail.com" || user.email === "mustaphaelibrahimi6@gmail.com") ? "admin" : "user",
               createdAt: new Date().toISOString(),
             };
             try {
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (fetchErr) {
           console.error("Error fetching profile:", fetchErr);
           // Fallback minimal profile if fetch fails but we have auth
-          if (user.email === "thefeedbuzz.store@gmail.com") {
+          if (user.email === "thefeedbuzz.store@gmail.com" || user.email === "mustaphaelibrahimi6@gmail.com") {
              setProfile({ uid: user.uid, role: "admin", email: user.email });
           }
         }

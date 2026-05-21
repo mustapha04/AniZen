@@ -13,8 +13,19 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'thefeedbuzz.store@gmail.com' ||
+        request.auth.token.email == 'xx' ||
         (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isModerator() {
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && (
+         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'moderator' ||
+         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin'
+        ))
       );
     }
 
@@ -24,12 +35,9 @@ service cloud.firestore {
 
     match /profiles/{uid} {
       allow get: if isSignedIn();
-      allow list: if isAdmin();
+      allow list: if isModerator();
       allow create: if isSignedIn() && request.auth.uid == uid;
-      allow update: if isAdmin() || (isOwner(uid) && (
-        request.resource.data.role == resource.data.role ||
-        request.auth.token.email == 'thefeedbuzz.store@gmail.com'
-      ));
+      allow update: if isAdmin() || (isOwner(uid) && request.resource.data.role == resource.data.role);
     }
 
     match /favorites/{favId} {
@@ -41,11 +49,11 @@ service cloud.firestore {
     match /comments/{commentId} {
       allow read: if true;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAdmin() || (isSignedIn() && (
+      allow update: if isAdmin() || isModerator() || (isSignedIn() && (
         isOwner(resource.data.userId) || 
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy'])
       ));
-      allow delete: if isAdmin() || (isSignedIn() && isOwner(resource.data.userId));
+      allow delete: if isAdmin() || isModerator() || (isSignedIn() && isOwner(resource.data.userId));
     }
 
     match /ratings/{ratingId} {

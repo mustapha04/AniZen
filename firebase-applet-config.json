@@ -1,10 +1,10 @@
 {
-  "projectId": "manifest-actor-v8gvj",
-  "appId": "1:540131954506:web:8b1198d522f24adac8bbb3",
-  "apiKey": "AIzaSyArUxHmYI6X1hnl8P0C4fYbEXAU5jDQ88c",
-  "authDomain": "manifest-actor-v8gvj.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-1930d968-fc58-4aca-b2de-6d51dd387a9e",
-  "storageBucket": "manifest-actor-v8gvj.firebasestorage.app",
-  "messagingSenderId": "540131954506",
+  "projectId": "anizen-92ba9",
+  "appId": "1:377157829495:web:9b1c304b64ff8338979772",
+  "apiKey": "AIzaSyCMzese2eQO00bFRlYaSXjxRp4uzlRQ_rQ",
+  "authDomain": "anizen-92ba9.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "anizen-92ba9.firebasestorage.app",
+  "messagingSenderId": "377157829495",
   "measurementId": ""
 }

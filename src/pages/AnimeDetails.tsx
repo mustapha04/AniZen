@@ -112,9 +112,22 @@ export default function AnimeDetails() {
 
   useEffect(() => {
     if (!id) return;
-    const q = query(collection(db, "comments"), where("animeId", "==", Number(id)), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "comments"), where("animeId", "==", Number(id)));
+    const getCommentTime = (createdAt: any): number => {
+      if (!createdAt) return Date.now();
+      if (typeof createdAt.toDate === "function") {
+        return createdAt.toDate().getTime();
+      }
+      if (createdAt.seconds !== undefined) {
+        return createdAt.seconds * 1000;
+      }
+      const d = new Date(createdAt);
+      return isNaN(d.getTime()) ? Date.now() : d.getTime();
+    };
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setComments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      fetched.sort((a: any, b: any) => getCommentTime(b.createdAt) - getCommentTime(a.createdAt));
+      setComments(fetched);
     });
     return () => unsubscribe();
   }, [id]);

@@ -11,6 +11,7 @@ import {
   addDoc 
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import { 
   Users, 
   MessageSquare, 
@@ -33,12 +34,14 @@ import {
   Tooltip, 
   ResponsiveContainer,
   AreaChart,
-  Area
+  Area,
+  Legend
 } from "recharts";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
 
 export default function AdminDashboard() {
+  const { profile } = useAuth();
   const [stats, setStats] = useState({
     users: 0,
     comments: 0,
@@ -48,43 +51,205 @@ export default function AdminDashboard() {
   const [usersList, setUsersList] = useState<any[]>([]);
   const [commentsList, setCommentsList] = useState<any[]>([]);
   const [affiliateLinks, setAffiliateLinks] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'users' | 'comments' | 'affiliates'>('users');
+  const [affiliateClicks, setAffiliateClicks] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'users' | 'comments' | 'affiliates'>('comments');
   const [loading, setLoading] = useState(true);
+
+  // Timeframes and Metric types for real Engagement Analytics + Growth Metrics
+  const [analyticsData, setAnalyticsData] = useState<{
+    daily: any[];
+    weekly: any[];
+  }>({ daily: [], weekly: [] });
+  const [engagementTimeframe, setEngagementTimeframe] = useState<'day' | 'week'>('day');
+  const [growthTimeframe, setGrowthTimeframe] = useState<'day' | 'week'>('day');
+  const [growthMetricType, setGrowthMetricType] = useState<'new' | 'cumulative'>('new');
+
+  useEffect(() => {
+    if (profile?.role === 'admin') {
+      setActiveTab('users');
+    } else {
+      setActiveTab('comments');
+    }
+  }, [profile]);
 
   // New affiliate state
   const [newLink, setNewLink] = useState({ animeId: "", platform: "", url: "" });
 
-  const activityData = [
-    { name: "Mon", users: 400, comments: 240 },
-    { name: "Tue", users: 300, comments: 139 },
-    { name: "Wed", users: 200, comments: 980 },
-    { name: "Thu", users: 278, comments: 390 },
-    { name: "Fri", users: 189, comments: 480 },
-    { name: "Sat", users: 239, comments: 380 },
-    { name: "Sun", users: 349, comments: 430 }
-  ];
+  const parseDate = (val: any): Date | null => {
+    if (!val) return null;
+    if (typeof val.toDate === "function") {
+      return val.toDate();
+    }
+    if (val.seconds !== undefined) {
+      return new Date(val.seconds * 1000);
+    }
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  };
 
   useEffect(() => {
     async function fetchAdminData() {
       try {
-        const [usersSnap, commentsSnap, favoritesSnap, ratingsSnap, affiliateSnap] = await Promise.all([
+        const [usersSnap, commentsSnap, favoritesSnap, ratingsSnap, affiliateSnap, affiliateClicksSnap] = await Promise.all([
           getDocs(collection(db, "profiles")),
-          getDocs(query(collection(db, "comments"), orderBy("createdAt", "desc"), limit(20))),
+          getDocs(collection(db, "comments")),
           getDocs(collection(db, "favorites")),
           getDocs(collection(db, "ratings")),
-          getDocs(collection(db, "affiliate_links"))
+          getDocs(collection(db, "affiliate_links")),
+          getDocs(collection(db, "affiliate_clicks"))
         ]);
 
+        const totalUsers = usersSnap.size;
+        const totalComments = commentsSnap.size;
+        const totalFavorites = favoritesSnap.size;
+        const totalRatings = ratingsSnap.size;
+
         setStats({
-          users: usersSnap.size,
-          comments: commentsSnap.size,
-          favorites: favoritesSnap.size,
-          ratings: ratingsSnap.size
+          users: totalUsers,
+          comments: totalComments,
+          favorites: totalFavorites,
+          ratings: totalRatings
         });
 
-        setUsersList(usersSnap.docs.map(d => d.data()));
-        setCommentsList(commentsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setAffiliateLinks(affiliateSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const users = usersSnap.docs.map(d => d.data());
+        const comments: any[] = commentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const affiliates = affiliateSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const clicks = affiliateClicksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        setUsersList(users);
+        setAffiliateLinks(affiliates);
+        setAffiliateClicks(clicks);
+
+        // Sort comments by date descending for Content Moderation section
+        const sortedComments = [...comments];
+        sortedComments.sort((a, b) => {
+          const dateA = parseDate(a.createdAt) || new Date(0);
+          const dateB = parseDate(b.createdAt) || new Date(0);
+          return dateB.getTime() - dateA.getTime();
+        });
+        setCommentsList(sortedComments);
+
+        // Calculate REAL Daily Analytics (last 7 days)
+        const dailyRange = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          dailyRange.push({
+            name: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+            startMs: new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime(),
+            endMs: new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime(),
+            comments: 0,
+            favorites: 0,
+            ratings: 0,
+            users: 0,
+            engagement: 0,
+            cumulativeUsers: 0
+          });
+        }
+
+        // Sort all profiles chronologically to compute dynamic cumulative user growths
+        const cronProfiles = [...users];
+        cronProfiles.sort((a, b) => {
+          const dateA = parseDate(a.createdAt) || new Date(0);
+          const dateB = parseDate(b.createdAt) || new Date(0);
+          return dateA.getTime() - dateB.getTime();
+        });
+
+        const firstDailyStartMs = dailyRange[0].startMs;
+        let cumulativeUsersCount = cronProfiles.filter(p => {
+          const d = parseDate(p.createdAt);
+          return d && d.getTime() < firstDailyStartMs;
+        }).length;
+
+        dailyRange.forEach(bucket => {
+          const newUsersOnDay = cronProfiles.filter(p => {
+            const d = parseDate(p.createdAt);
+            return d && d.getTime() >= bucket.startMs && d.getTime() <= bucket.endMs;
+          }).length;
+
+          bucket.users = newUsersOnDay;
+          cumulativeUsersCount += newUsersOnDay;
+          bucket.cumulativeUsers = cumulativeUsersCount;
+
+          bucket.comments = comments.filter(c => {
+            const d = parseDate(c.createdAt);
+            return d && d.getTime() >= bucket.startMs && d.getTime() <= bucket.endMs;
+          }).length;
+
+          bucket.favorites = favoritesSnap.docs.filter(f => {
+            const d = parseDate(f.data().createdAt);
+            return d && d.getTime() >= bucket.startMs && d.getTime() <= bucket.endMs;
+          }).length;
+
+          bucket.ratings = ratingsSnap.docs.filter(r => {
+            const d = parseDate(r.data().createdAt);
+            return d && d.getTime() >= bucket.startMs && d.getTime() <= bucket.endMs;
+          }).length;
+
+          bucket.engagement = bucket.comments + bucket.favorites + bucket.ratings;
+        });
+
+        // Calculate REAL Weekly Analytics (last 4 weeks)
+        const weeklyRange = [];
+        for (let i = 3; i >= 0; i--) {
+          const end = new Date();
+          end.setDate(end.getDate() - (i * 7));
+          const start = new Date();
+          start.setDate(start.getDate() - (i * 7 + 6));
+
+          const startMs = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0).getTime();
+          const endMs = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999).getTime();
+
+          weeklyRange.push({
+            name: `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
+            startMs,
+            endMs,
+            comments: 0,
+            favorites: 0,
+            ratings: 0,
+            users: 0,
+            engagement: 0,
+            cumulativeUsers: 0
+          });
+        }
+
+        let cumulativeWeeklyUsers = cronProfiles.filter(p => {
+          const d = parseDate(p.createdAt);
+          return d && d.getTime() < weeklyRange[0].startMs;
+        }).length;
+
+        weeklyRange.forEach(bucket => {
+          const newUsersOnWeek = cronProfiles.filter(p => {
+            const d = parseDate(p.createdAt);
+            return d && d.getTime() >= bucket.startMs && d.getTime() <= bucket.endMs;
+          }).length;
+
+          bucket.users = newUsersOnWeek;
+          cumulativeWeeklyUsers += newUsersOnWeek;
+          bucket.cumulativeUsers = cumulativeWeeklyUsers;
+
+          bucket.comments = comments.filter(c => {
+            const d = parseDate(c.createdAt);
+            return d && d.getTime() >= bucket.startMs && d.getTime() <= bucket.endMs;
+          }).length;
+
+          bucket.favorites = favoritesSnap.docs.filter(f => {
+            const d = parseDate(f.data().createdAt);
+            return d && d.getTime() >= bucket.startMs && d.getTime() <= bucket.endMs;
+          }).length;
+
+          bucket.ratings = ratingsSnap.docs.filter(r => {
+            const d = parseDate(r.data().createdAt);
+            return d && d.getTime() >= bucket.startMs && d.getTime() <= bucket.endMs;
+          }).length;
+
+          bucket.engagement = bucket.comments + bucket.favorites + bucket.ratings;
+        });
+
+        setAnalyticsData({
+          daily: dailyRange,
+          weekly: weeklyRange
+        });
       } catch (e) {
         console.error(e);
       } finally {
@@ -132,8 +297,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const toggleAdmin = async (uid: string, currentRole: string) => {
-    const newRole = currentRole === "admin" ? "user" : "admin";
+  const changeUserRole = async (uid: string, newRole: 'user' | 'moderator' | 'admin') => {
     try {
       await updateDoc(doc(db, "profiles", uid), { role: newRole });
       setUsersList(prev => prev.map(u => u.uid === uid ? { ...u, role: newRole } : u));
@@ -154,8 +318,14 @@ export default function AdminDashboard() {
     <div className="pt-24 pb-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex items-center justify-between mb-10">
         <div>
-          <h1 className="text-4xl font-display font-black text-white mb-2 tracking-tight">Command Center</h1>
-          <p className="text-gray-500">Overview of platform health and community activity.</p>
+          <h1 className="text-4xl font-display font-black text-white mb-2 tracking-tight">
+            {profile?.role === 'admin' ? 'Command Center' : 'Moderator Panel'}
+          </h1>
+          <p className="text-gray-500">
+            {profile?.role === 'admin' 
+              ? 'Overview of platform health and community activity.' 
+              : 'Moderate community discussions and comment streams.'}
+          </p>
         </div>
         <button className="px-6 py-2 bg-white/5 border border-white/10 rounded-xl text-white font-bold hover:bg-white/10 transition-all flex items-center gap-2">
           <ExternalLink className="w-4 h-4" />
@@ -173,28 +343,33 @@ export default function AdminDashboard() {
 
       {/* Tabs */}
       <div className="flex gap-4 mb-8 border-b border-white/5 pb-4">
-        <button 
-          onClick={() => setActiveTab('users')}
-          className={cn("px-4 py-2 text-sm font-bold transition-all", activeTab === 'users' ? "text-brand border-b-2 border-brand" : "text-gray-500 hover:text-white")}
-        >
-          User Management
-        </button>
+        {profile?.role === 'admin' && (
+          <button 
+            onClick={() => setActiveTab('users')}
+            className={cn("px-4 py-2 text-sm font-bold transition-all", activeTab === 'users' ? "text-brand border-b-2 border-brand" : "text-gray-500 hover:text-white")}
+          >
+            User Management
+          </button>
+        )}
         <button 
           onClick={() => setActiveTab('comments')}
           className={cn("px-4 py-2 text-sm font-bold transition-all", activeTab === 'comments' ? "text-brand border-b-2 border-brand" : "text-gray-500 hover:text-white")}
         >
-          Moderation
+          Content Moderation
         </button>
-        <button 
-          onClick={() => setActiveTab('affiliates')}
-          className={cn("px-4 py-2 text-sm font-bold transition-all", activeTab === 'affiliates' ? "text-brand border-b-2 border-brand" : "text-gray-500 hover:text-white")}
-        >
-          Affiliates
-        </button>
+        {profile?.role === 'admin' && (
+          <button 
+            onClick={() => setActiveTab('affiliates')}
+            className={cn("px-4 py-2 text-sm font-bold transition-all", activeTab === 'affiliates' ? "text-brand border-b-2 border-brand" : "text-gray-500 hover:text-white")}
+          >
+            Affiliates
+          </button>
+        )}
       </div>
 
       {activeTab === 'affiliates' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
            <div className="lg:col-span-1 bg-card-dark p-8 rounded-3xl border border-white/5 h-fit">
               <h3 className="text-xl font-bold mb-6">Add Affiliate Link</h3>
               <form onSubmit={addAffiliateLink} className="space-y-4">
@@ -253,7 +428,7 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4">
                         <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-bold">{link.platform}</span>
                       </td>
-                      <td className="px-6 py-4 text-emerald-400 font-bold">{link.clicks || 0}</td>
+                      <td className="px-6 py-4 text-emerald-400 font-bold">{affiliateClicks.filter((c: any) => Number(c.animeId) === Number(link.animeId) && c.platform === link.platform).length}</td>
                       <td className="px-6 py-4 text-right">
                         <button onClick={() => deleteAffiliateLink(link.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg">
                           <Trash2 className="w-4 h-4" />
@@ -264,53 +439,199 @@ export default function AdminDashboard() {
                 </tbody>
              </table>
            </div>
+          </div>
+
+          <div className="bg-card-dark rounded-3xl border border-white/5 overflow-hidden">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-white text-lg">Affiliate Click Activity Log</h3>
+                <p className="text-xs text-gray-500">Real-time log of affiliate link redirects clicked by users.</p>
+              </div>
+              <span className="text-xs text-brand font-bold bg-brand/10 px-3 py-1 rounded-full">
+                {affiliateClicks.length} total clicks
+              </span>
+            </div>
+            {affiliateClicks.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-white/2 text-[10px] uppercase tracking-widest text-gray-400 font-bold border-b border-white/5">
+                    <tr>
+                      <th className="px-6 py-4">Click Time</th>
+                      <th className="px-6 py-4">User ID</th>
+                      <th className="px-6 py-4">Anime ID</th>
+                      <th className="px-6 py-4">Platform</th>
+                      <th className="px-6 py-4">Platform Icon</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {[...affiliateClicks]
+                      .sort((a, b) => {
+                        const dateA = parseDate(a.clickedAt) || new Date(0);
+                        const dateB = parseDate(b.clickedAt) || new Date(0);
+                        return dateB.getTime() - dateA.getTime();
+                      })
+                      .slice(0, 50)
+                      .map((click) => {
+                        const clickDate = parseDate(click.clickedAt);
+                        return (
+                          <tr key={click.id} className="hover:bg-white/1 transition-colors text-sm">
+                            <td className="px-6 py-4 text-gray-400">
+                              {clickDate ? clickDate.toLocaleString() : "Just now"}
+                            </td>
+                            <td className="px-6 py-4 font-mono text-xs text-gray-300 font-medium">
+                              {click.userId === "anonymous" ? (
+                                <span className="text-gray-500 italic">Guest User</span>
+                              ) : (
+                                <span className="text-brand" title={click.userId}>
+                                  User: {click.userId?.slice(0, 8)}...
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 font-mono text-xs font-semibold text-gray-200">
+                              {click.animeId}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="px-2.5 py-1 bg-white/10 rounded-lg text-xs font-bold text-gray-200">
+                                {click.platform}
+                              </span>
+                            </td>
+                            <td className="px-6 py-3">
+                              <div className="w-7 h-7 rounded-lg bg-brand/15 text-white/90 flex items-center justify-center font-black text-xs uppercase shadow-inner border border-white/5">
+                                {click.platform ? click.platform[0] : "?"}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-12 text-center text-gray-500">
+                <p className="text-sm">No affiliate clicks logged yet.</p>
+                <p className="text-xs text-gray-600 mt-1">Clicks are recorded when users watch on external platforms.</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-        <div className="bg-white/5 border border-white/10 p-8 rounded-[32px] h-[400px]">
-          <h3 className="text-lg font-bold mb-8 flex items-center justify-between">
-            Engagement Analytics
-            <div className="flex gap-2">
-              <button className="px-3 py-1 rounded-full bg-white/10 text-[10px] font-bold uppercase">Day</button>
-              <button className="px-3 py-1 rounded-full bg-indigo-500 text-[10px] font-bold uppercase">Week</button>
+        <div className="bg-white/5 border border-white/10 p-6 sm:p-8 rounded-[32px] min-h-[460px] flex flex-col justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-white leading-none mb-1">Engagement Analytics</h3>
+              <p className="text-[11px] text-gray-500">Comments, favorites, and ratings activity.</p>
             </div>
-          </h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={activityData}>
-              <defs>
-                <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="name" stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
-              <YAxis stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
-              <Tooltip 
-                contentStyle={{ backgroundColor: "#0a0a0b", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", fontSize: "12px" }}
-                itemStyle={{ color: "#fff" }}
-              />
-              <Area type="monotone" dataKey="users" stroke="#6366f1" fillOpacity={1} fill="url(#colorUsers)" strokeWidth={3} />
-            </AreaChart>
-          </ResponsiveContainer>
+            <div className="flex gap-1.5 bg-white/5 border border-white/10 p-1 rounded-xl">
+              <button 
+                onClick={() => setEngagementTimeframe('day')}
+                className={cn("px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all", engagementTimeframe === 'day' ? "bg-white/10 text-white shadow" : "text-gray-500 hover:text-white")}
+              >
+                Day
+              </button>
+              <button 
+                onClick={() => setEngagementTimeframe('week')}
+                className={cn("px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all", engagementTimeframe === 'week' ? "bg-white/10 text-white shadow" : "text-gray-500 hover:text-white")}
+              >
+                Week
+              </button>
+            </div>
+          </div>
+          
+          <div className="h-[280px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={engagementTimeframe === 'day' ? analyticsData.daily : analyticsData.weekly}>
+                <defs>
+                  <linearGradient id="colorComments" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorFavorites" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorRatings" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="name" stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: "#0a0a0b", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", fontSize: "12px" }}
+                  itemStyle={{ fontSize: "11px" }}
+                />
+                <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', color: '#888' }} />
+                <Area type="monotone" name="Comments" dataKey="comments" stroke="#10b981" fillOpacity={1} fill="url(#colorComments)" strokeWidth={3} />
+                <Area type="monotone" name="Favorites" dataKey="favorites" stroke="#f59e0b" fillOpacity={1} fill="url(#colorFavorites)" strokeWidth={3} />
+                <Area type="monotone" name="Ratings" dataKey="ratings" stroke="#f43f5e" fillOpacity={1} fill="url(#colorRatings)" strokeWidth={3} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        <div className="bg-white/5 border border-white/10 p-8 rounded-[32px] h-[400px]">
-          <h3 className="text-lg font-bold mb-8 flex items-center gap-2">
-             Growth Metrics
-          </h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={activityData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
-              <XAxis dataKey="name" stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
-              <YAxis stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
-              <Tooltip 
-                 contentStyle={{ backgroundColor: "#0a0a0b", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px" }}
-              />
-              <Bar dataKey="users" fill="#6366f1" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="bg-white/5 border border-white/10 p-6 sm:p-8 rounded-[32px] min-h-[460px] flex flex-col justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-white leading-none mb-1">Growth Metrics</h3>
+              <p className="text-[11px] text-gray-500">Registered users trend over time.</p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex gap-1 bg-white/5 border border-white/10 p-0.5 rounded-xl">
+                <button 
+                  onClick={() => setGrowthMetricType('new')}
+                  className={cn("px-2.5 py-1 rounded-lg text-[9px] font-black uppercase transition-all", growthMetricType === 'new' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300")}
+                >
+                  New Users
+                </button>
+                <button 
+                  onClick={() => setGrowthMetricType('cumulative')}
+                  className={cn("px-2.5 py-1 rounded-lg text-[9px] font-black uppercase transition-all", growthMetricType === 'cumulative' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300")}
+                >
+                  Total Base
+                </button>
+              </div>
+
+              <div className="flex gap-1.5 bg-white/5 border border-white/10 p-1 rounded-xl">
+                <button 
+                  onClick={() => setGrowthTimeframe('day')}
+                  className={cn("px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all", growthTimeframe === 'day' ? "bg-white/10 text-white shadow" : "text-gray-500 hover:text-white")}
+                >
+                  Day
+                </button>
+                <button 
+                  onClick={() => setGrowthTimeframe('week')}
+                  className={cn("px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all", growthTimeframe === 'week' ? "bg-white/10 text-white shadow" : "text-gray-500 hover:text-white")}
+                >
+                  Week
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div className="h-[280px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={growthTimeframe === 'day' ? analyticsData.daily : analyticsData.weekly}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
+                <XAxis dataKey="name" stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis stroke="#555" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: "#0a0a0b", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", fontSize: "12px" }}
+                  itemStyle={{ fontSize: "11px" }}
+                />
+                <Legend verticalAlign="top" height={36} iconType="rect" iconSize={12} wrapperStyle={{ fontSize: '11px', color: '#888' }} />
+                <Bar 
+                  name={growthMetricType === 'new' ? "New Users Registered" : "Total User Base (Cumulative)"} 
+                  dataKey={growthMetricType === 'new' ? 'users' : 'cumulativeUsers'} 
+                  fill={growthMetricType === 'new' ? '#6366f1' : '#a855f7'} 
+                  radius={[6, 6, 0, 0]} 
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
@@ -346,24 +667,26 @@ export default function AdminDashboard() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={cn(
-                            "text-[10px] font-black uppercase px-2 py-1 rounded-md",
-                            u.role === "admin" ? "bg-purple-500/20 text-purple-400" : "bg-gray-500/20 text-gray-400"
-                          )}>
-                            {u.role}
-                          </span>
+                          <select
+                            value={u.role || "user"}
+                            onChange={(e) => changeUserRole(u.uid, e.target.value as any)}
+                            className={cn(
+                              "text-xs font-bold rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer border transition-all",
+                              u.role === "admin" && "text-purple-400 border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10",
+                              u.role === "moderator" && "text-blue-400 border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10",
+                              u.role === "user" && "text-gray-400 border-white/5 bg-white/5 hover:bg-white/10"
+                            )}
+                          >
+                            <option value="user" className="bg-bg-dark text-gray-300">User</option>
+                            <option value="moderator" className="bg-bg-dark text-blue-400">Moderator</option>
+                            <option value="admin" className="bg-bg-dark text-purple-400">Admin</option>
+                          </select>
                         </td>
                         <td className="px-6 py-4 text-xs text-gray-500">
                           {new Date(u.createdAt).toLocaleDateString()}
                         </td>
-                        <td className="px-6 py-4">
-                          <button 
-                            onClick={() => toggleAdmin(u.uid, u.role)}
-                            className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-brand transition-all"
-                            title={u.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
-                          >
-                            {u.role === "admin" ? <ShieldAlert className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-                          </button>
+                        <td className="px-6 py-4 text-gray-400 font-medium text-xs">
+                          {u.role === "admin" ? "Full Access" : u.role === "moderator" ? "Moderation Only" : "Standard User"}
                         </td>
                       </tr>
                     ))}

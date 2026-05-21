@@ -23,8 +23,10 @@ export default function AdminLogin() {
       console.error(e);
       if (e.code === 'auth/popup-blocked' || e.code === 'auth/cancelled-popup-request' || e.message?.includes('assertion failed')) {
         setError('Login blocked! Click the "Open App" button below to log in in a new tab.');
+      } else if (e.code === 'auth/unauthorized-domain') {
+        setError(`Domain not authorized! You must add "${window.location.hostname}" to the Authorized Domains list in your Firebase Console (Authentication > Settings > Authorized Domains).`);
       } else {
-        setError('Authentication failed.');
+        setError(`Authentication failed: ${e.message || e.code}`);
       }
     } finally {
       setLoading(false);
