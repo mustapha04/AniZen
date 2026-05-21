@@ -4,6 +4,7 @@ import { Search, Heart, User, LogOut, Menu, X, LayoutDashboard } from "lucide-re
 import { useAuth } from "../contexts/AuthContext";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
+import brandLogo from "../assets/images/anizen_white_icon_logo_1779362416802.png";
 
 export default function Navbar() {
   const { user, profile, logout } = useAuth();
@@ -21,8 +22,13 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-8">
             <Link to="/" className="flex items-center gap-3">
-              <div className="w-10 h-10 brand-gradient rounded-xl flex items-center justify-center font-display font-bold text-white shadow-lg shadow-brand/20">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+              <div className="w-9 h-9 rounded-2xl overflow-hidden border border-white/10 hover:border-brand/40 shadow-md shadow-brand/10 transition-all duration-300">
+                <img 
+                  src={brandLogo} 
+                  alt="AniZen Logo" 
+                  className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-300" 
+                  referrerPolicy="no-referrer" 
+                />
               </div>
               <span className="text-xl font-display font-bold tracking-tight text-gradient">AniZen</span>
             </Link>

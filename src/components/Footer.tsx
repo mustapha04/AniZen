@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Github, Twitter, Youtube, Instagram } from "lucide-react";
+import brandLogo from "../assets/images/anizen_white_icon_logo_1779362416802.png";
 
 export default function Footer() {
   return (
@@ -8,8 +9,15 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
           <div className="col-span-1 md:col-span-2">
-            <Link to="/" className="flex items-center gap-2 mb-6">
-              <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center font-display font-bold text-white">A</div>
+            <Link to="/" className="flex items-center gap-3 mb-6">
+              <div className="w-8 h-8 rounded-xl overflow-hidden border border-white/10 hover:border-brand/40 shadow-sm shadow-brand/10 transition-all duration-300">
+                <img 
+                  src={brandLogo} 
+                  alt="AniZen Logo" 
+                  className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-300" 
+                  referrerPolicy="no-referrer" 
+                />
+              </div>
               <span className="text-xl font-display font-bold tracking-tight text-white">AniZen</span>
             </Link>
             <p className="text-gray-500 max-w-sm leading-relaxed mb-6">
