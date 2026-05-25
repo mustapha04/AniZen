@@ -102,9 +102,24 @@ export default function AnimeDetails() {
   useEffect(() => {
     if (!id) return;
     async function fetchAffiliates() {
-      const q = query(collection(db, "affiliate_links"), where("animeId", "==", Number(id)));
-      const snap = await getDocs(q);
-      setAffiliateLinks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const qSpecific = query(collection(db, "affiliate_links"), where("animeId", "==", Number(id)));
+      const qAll = query(collection(db, "affiliate_links"), where("isAll", "==", true));
+      
+      const [snapSpecific, snapAll] = await Promise.all([
+        getDocs(qSpecific),
+        getDocs(qAll)
+      ]);
+      
+      const specificLinks = snapSpecific.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allLinks = snapAll.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      const combined = [...specificLinks];
+      allLinks.forEach(item => {
+        if (!combined.some(c => c.id === item.id)) {
+          combined.push(item);
+        }
+      });
+      setAffiliateLinks(combined);
     }
     async function fetchUserLists() {
       if (user) {
@@ -273,6 +288,7 @@ export default function AnimeDetails() {
         userId: user?.uid || "anonymous",
         animeId: Number(id),
         platform: link.platform,
+        linkId: link.id || "",
         clickedAt: serverTimestamp()
       });
       
@@ -635,7 +651,7 @@ export default function AnimeDetails() {
               {affiliateLinks.length > 0 ? affiliateLinks.map((link) => (
                 <a 
                   key={link.id}
-                  href={link.affiliateUrl} 
+                  href={link.affiliateUrl?.startsWith('http://') || link.affiliateUrl?.startsWith('https://') || link.affiliateUrl?.startsWith('//') ? link.affiliateUrl : `https://${link.affiliateUrl}`} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   onClick={() => trackClick(link)}
